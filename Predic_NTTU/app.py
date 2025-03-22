@@ -213,11 +213,16 @@ with tab3:
 
         # Dự đoán hàng loạt sinh viên
     def predict_students(df):
-        if os.path.exists("du_doan_diem_cuoiky.pkl"):
-            rf_regressor = joblib.load("du_doan_diem_cuoiky.pkl")
-        else:
-            st.error("❌ Không tìm thấy mô hình đã huấn luyện. Vui lòng huấn luyện mô hình từ file PDF trước!")
-            return None, None  # ⬅ Dừng hoàn toàn, không để chương trình tiếp tục
+        model_path = "du_doan_diem_cuoiky.pkl"
+    
+    # Nếu file không tồn tại, huấn luyện lại mô hình
+        if not os.path.exists(model_path):
+            st.warning("⚠️ Không tìm thấy mô hình, đang huấn luyện lại...")
+            rf_regressor, rf_classifier = train_models(df)  # Huấn luyện lại mô hình
+            joblib.dump(rf_regressor, model_path)  # Lưu mô hình lại
+
+    # Tải mô hình từ file
+        rf_regressor = joblib.load(model_path)
 
         df["Dự đoán Cuối kỳ"] = rf_regressor.predict(df[["Giữa kỳ", "Thường kỳ", "Thực hành"]])
         df["Dự đoán qua môn"] = np.where(df["Dự đoán Cuối kỳ"] >= 5, "Qua môn", "Rớt môn")
