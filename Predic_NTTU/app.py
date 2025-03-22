@@ -15,14 +15,16 @@ import os
 # Cấu hình trang
 st.set_page_config(page_title="Dự đoán điểm sinh viên", layout="wide")
 
-# Ẩn thanh công cụ Streamlit
+# Ẩn thanh công cụ Streamlit và các biểu tượng "Running", "Share"
 st.markdown(
     """
     <style>
     [data-testid="stToolbar"] {
         visibility: hidden;
     }
-    
+    [data-testid="stStatusWidget"] {
+        visibility: hidden;
+    }
     [data-testid="stDecoration"] {
         visibility: hidden;
     }
@@ -198,16 +200,26 @@ else:
                 rot_mon = rf_classifier.predict(input_clf)[0]
                 
                 st.write(f"### 📈 Điểm cuối kỳ dự đoán: {diem_cuoi_ky:.2f}")
-                if rot_mon == 0:
-                    st.success("✅ Sinh viên có khả năng qua môn!")
-                else:
-                    st.error("❌ Sinh viên có nguy cơ rớt môn!")
                 
-                df_clean["Khoảng cách"] = euclidean_distances(df_clean[["Giữa kỳ", "Thường kỳ", "Thực hành"]], input_reg).flatten()
-                similar_students = df_clean.nsmallest(5, "Khoảng cách")[["Mã SV", "Họ đệm", "Tên", "Giữa kỳ", "Thường kỳ", "Thực hành", "Điểm cuối kỳ"]]
-                
-                st.write("### 🏫 Sinh viên có điểm tương đồng:")
-                st.dataframe(similar_students)
+                # Kiểm tra vai trò để hiển thị thông báo phù hợp
+                if st.session_state.role == "sinhvien":
+                    if rot_mon == 0:
+                        st.success("✅ Sinh viên có khả năng qua môn!")
+                        st.warning("⚠️ Bạn hiện tại dự đoán là qua môn, nhưng hãy đừng chủ quan nhé!")
+                    else:
+                        st.error("❌ Sinh viên có nguy cơ rớt môn!")
+                        st.warning("⚠️ Bạn nên học bài thật tốt hơn để không bị nguy cơ rớt môn.")
+                else:  # Vai trò giảng viên
+                    if rot_mon == 0:
+                        st.success("✅ Sinh viên có khả năng qua môn!")
+                    else:
+                        st.error("❌ Sinh viên có nguy cơ rớt môn!")
+                    
+                    # Hiển thị sinh viên tương đồng chỉ cho giảng viên
+                    df_clean["Khoảng cách"] = euclidean_distances(df_clean[["Giữa kỳ", "Thường kỳ", "Thực hành"]], input_reg).flatten()
+                    similar_students = df_clean.nsmallest(5, "Khoảng cách")[["Mã SV", "Họ đệm", "Tên", "Giữa kỳ", "Thường kỳ", "Thực hành", "Điểm cuối kỳ"]]
+                    st.write("### 🏫 Sinh viên có điểm tương đồng:")
+                    st.dataframe(similar_students)
             else:
                 st.error("❌ Mô hình chưa được huấn luyện. Vui lòng kiểm tra file output.csv hoặc liên hệ giảng viên để tải dữ liệu!")
 
@@ -244,75 +256,99 @@ else:
 
         with tab3:
             st.title("Dự đoán Điểm cuối kỳ và Rủi ro Rớt môn")
-            uploaded_file = st.file_uploader("Tải lên file Excel", type=["xls", "xlsx"], key="excel_uploader_tab3")  # Hỗ trợ cả .xls và .xlsx
+            uploaded_file = st.file_uploader("Tải lên file Excel", type=["xls", "xlsx"], key="excel_uploader_tab3")
 
             if uploaded_file:
+                # Đọc file Excel
                 xls = pd.ExcelFile(uploaded_file)
-                df = pd.read_excel(xls, sheet_name=xls.sheet_names[0])
+                df = pd.read_excel(xls, sheet_name=xls.sheet_names[0], header=None)
 
-                df_cleaned = df.dropna(how="all").reset_index(drop=True)
-                stt_column = df_cleaned.iloc[:, 0]
-                stt_start_index = stt_column[stt_column == 1].index[0]
-                df_filtered = df_cleaned.iloc[stt_start_index:].reset_index(drop=True)
-                df_filtered.columns = [
-                    "STT", "MSSV", "Họ", "Tên", "Giới tính", "Ngày sinh", "Lớp",
-                    "Giữa kỳ", "Thường kỳ", "Điểm 3", "Điểm 4", "Thực hành",
-                    "Điểm 6", "Điểm 7", "Điểm 8", "Điểm 9", "Điểm 10"
+                # Tìm dòng bắt đầu dữ liệu (dòng có "STT" ở cột đầu tiên)
+                stt_row_idx = df[df.iloc[:, 0] == "STT"].index[0]
+                df_cleaned = df.iloc[stt_row_idx:].reset_index(drop=True)
+
+                # Gán tên cột từ dòng tiêu đề
+                headers = df_cleaned.iloc[0].fillna("").tolist()
+                df_cleaned = df_cleaned[1:].reset_index(drop=True)
+                df_cleaned.columns = headers
+
+                # Loại bỏ các dòng không phải dữ liệu sinh viên
+                df_filtered = df_cleaned[
+                    df_cleaned["STT"].notna() & 
+                    df_cleaned["STT"].str.match(r'^\d+$')
                 ]
-                df_filtered = df_filtered.dropna(axis=1, how="all")
-                df_filtered = df_filtered[~df_filtered.astype(str).apply(
-                    lambda row: row.str.contains(
-                        "Tổng cộng|Các bộ giảng dạy|Cán bộ Giảng dạy|Trưởng khoa - Trưởng bộ môn",
-                        na=False, case=False
-                    )
-                ).any(axis=1)]
 
+                # Đổi tên cột để khớp với mô hình
+                df_filtered = df_filtered.rename(columns={
+                    "Giữa kỳ\n20%": "Giữa kỳ",
+                    "Thường kỳ 20%": "Thường kỳ",
+                    "1": "Thực hành"  # Lấy cột "1" dưới "Thực hành"
+                })
+
+                # Chuyển đổi kiểu dữ liệu
                 df_filtered[["Giữa kỳ", "Thường kỳ", "Thực hành"]] = df_filtered[["Giữa kỳ", "Thường kỳ", "Thực hành"]].apply(pd.to_numeric, errors="coerce")
 
-                def predict_students(df):
-                    try:
-                        if not rf_regressor:
-                            st.error("❌ Không tìm thấy mô hình đã huấn luyện. Vui lòng kiểm tra file output.csv hoặc tải file PDF trước!")
+                # Kiểm tra dữ liệu trước khi dự đoán
+                st.write("### Dữ liệu sau khi xử lý:")
+                st.dataframe(df_filtered[["STT", "Mã sinh viên", "Họ đệm", "Tên", "Giữa kỳ", "Thường kỳ", "Thực hành"]])
+                
+                if df_filtered.empty:
+                    st.error("❌ Không có dữ liệu hợp lệ để dự đoán. Vui lòng kiểm tra file Excel!")
+                elif df_filtered[["Giữa kỳ", "Thường kỳ", "Thực hành"]].isna().all().any():
+                    st.error("❌ Một hoặc nhiều cột điểm ('Giữa kỳ', 'Thường kỳ', 'Thực hành') chứa toàn giá trị NaN!")
+                else:
+                    # Loại bỏ các hàng có giá trị NaN trong các cột điểm
+                    df_filtered = df_filtered.dropna(subset=["Giữa kỳ", "Thường kỳ", "Thực hành"])
+                    st.write(f"Số lượng mẫu dữ liệu sau khi loại NaN: {len(df_filtered)}")
+
+                    def predict_students(df):
+                        try:
+                            if not rf_regressor:
+                                st.error("❌ Không tìm thấy mô hình đã huấn luyện. Vui lòng kiểm tra file output.csv hoặc tải file PDF trước!")
+                                return None, None
+                            
+                            if df[["Giữa kỳ", "Thường kỳ", "Thực hành"]].empty:
+                                st.error("❌ Dữ liệu đầu vào rỗng. Không thể dự đoán!")
+                                return None, None
+
+                            df["Dự đoán Cuối kỳ"] = rf_regressor.predict(df[["Giữa kỳ", "Thường kỳ", "Thực hành"]])
+                            df["Dự đoán qua môn"] = np.where(df["Dự đoán Cuối kỳ"] >= 4, "Qua môn", "Rớt môn")
+
+                            output_file = "du_doan_ketqua.xlsx"
+                            df.to_excel(output_file, index=False)
+                            return df, output_file
+                        except Exception as e:
+                            st.error(f"❌ Đã xảy ra lỗi khi dự đoán: {str(e)}")
                             return None, None
-                        
-                        df["Dự đoán Cuối kỳ"] = rf_regressor.predict(df[["Giữa kỳ", "Thường kỳ", "Thực hành"]])
-                        df["Dự đoán qua môn"] = np.where(df["Dự đoán Cuối kỳ"] >= 4, "Qua môn", "Rớt môn")
 
-                        output_file = "du_doan_ketqua.xlsx"
-                        df.to_excel(output_file, index=False)
-                        return df, output_file
-                    except Exception as e:
-                        st.error(f"❌ Đã xảy ra lỗi khi dự đoán: {str(e)}")
-                        return None, None
+                    if st.button("Dự đoán Điểm Cuối kỳ và Rủi ro Rớt môn", key="predict_button_tab3"):
+                        df_result, result_file = predict_students(df_filtered)
+                        if df_result is not None:
+                            st.success("✅ Dự đoán hoàn tất!")
+                            st.dataframe(df_result)
 
-                if st.button("Dự đoán Điểm Cuối kỳ và Rủi ro Rớt môn", key="predict_button_tab3"):
-                    df_result, result_file = predict_students(df_filtered)
-                    if df_result is not None:
-                        st.success("✅ Dự đoán hoàn tất!")
-                        st.dataframe(df_result)
+                            st.subheader("Danh sách sinh viên dự đoán rớt môn")
+                            df_failed = df_result[df_result["Dự đoán qua môn"] == "Rớt môn"]
+                            st.dataframe(df_failed)
 
-                        st.subheader("Danh sách sinh viên dự đoán rớt môn")
-                        df_failed = df_result[df_result["Dự đoán qua môn"] == "Rớt môn"]
-                        st.dataframe(df_failed)
+                            st.download_button(
+                                label="📥 Tải về kết quả dự đoán",
+                                data=open(result_file, "rb").read(),
+                                file_name="du_doan_ketqua.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                key="download_button_tab3"
+                            )
 
-                        st.download_button(
-                            label="📥 Tải về kết quả dự đoán",
-                            data=open(result_file, "rb").read(),
-                            file_name="du_doan_ketqua.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            key="download_button_tab3"
-                        )
-
-                        st.subheader("Phân bố điểm cuối kỳ dự đoán")
-                        fig, ax = plt.subplots(figsize=(10, 8))
-                        sns.histplot(df_result["Dự đoán Cuối kỳ"], bins=10, kde=True, ax=ax)
-                        ax.set_xlabel("Điểm Cuối kỳ Dự đoán")
-                        ax.set_ylabel("Số lượng sinh viên")
-                        st.pyplot(fig)
-                        
-                        st.subheader("Tỷ lệ sinh viên qua môn vs rớt môn")
-                        fig, ax = plt.subplots(figsize=(10, 8))
-                        sns.countplot(x="Dự đoán qua môn", data=df_result, hue="Dự đoán qua môn", palette="coolwarm", legend=False, ax=ax)
-                        ax.set_xlabel("Kết quả Dự đoán")
-                        ax.set_ylabel("Số lượng sinh viên")
-                        st.pyplot(fig)
+                            st.subheader("Phân bố điểm cuối kỳ dự đoán")
+                            fig, ax = plt.subplots(figsize=(10, 8))
+                            sns.histplot(df_result["Dự đoán Cuối kỳ"], bins=10, kde=True, ax=ax)
+                            ax.set_xlabel("Điểm Cuối kỳ Dự đoán")
+                            ax.set_ylabel("Số lượng sinh viên")
+                            st.pyplot(fig)
+                            
+                            st.subheader("Tỷ lệ sinh viên qua môn vs rớt môn")
+                            fig, ax = plt.subplots(figsize=(10, 8))
+                            sns.countplot(x="Dự đoán qua môn", data=df_result, hue="Dự đoán qua môn", palette="coolwarm", legend=False, ax=ax)
+                            ax.set_xlabel("Kết quả Dự đoán")
+                            ax.set_ylabel("Số lượng sinh viên")
+                            st.pyplot(fig)
