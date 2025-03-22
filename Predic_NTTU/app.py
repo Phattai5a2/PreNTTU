@@ -15,22 +15,6 @@ import os
 # Cấu hình trang
 st.set_page_config(page_title="Dự đoán điểm sinh viên", layout="wide")
 
-st.markdown(
-    """
-    <h1 style='text-align: center;'>🎓 Hệ thống dự đoán Điểm Cuối Kỳ & Khả Năng Qua Môn</h1>
-    """,
-    unsafe_allow_html=True
-)
-
-hide_streamlit_style = """
-    <style>
-    #MainMenu {visibility: hidden;} /* Ẩn menu */
-    footer {visibility: hidden;} /* Ẩn footer chứa GitHub */
-    header {visibility: hidden;} /* Ẩn header */
-    </style>
-"""
-st.markdown(hide_streamlit_style, unsafe_allow_html=True)
-
 # Hàm kiểm tra đăng nhập
 def check_login(username, password):
     users = {
@@ -136,17 +120,20 @@ else:
     # --- Hàm tải và xử lý dữ liệu ---
     @st.cache_data
     def load_data():
-        df = pd.read_csv(csv_path)
+        df = pd.read_csv("output.csv")
         cols_to_convert = ["Giữa kỳ", "Thường kỳ", "Thực hành", "Điểm cuối kỳ"]
         for col in cols_to_convert:
             df[col] = pd.to_numeric(df[col].str.replace(',', '.'), errors='coerce')
         df = df.dropna()
         return df
 
-    try:
-        df_clean = load_data()
-    except FileNotFoundError:
-        df_clean = pd.DataFrame()
+    # Kiểm tra và tải dữ liệu nếu file output.csv tồn tại
+    df_clean = pd.DataFrame()
+    if os.path.exists("output.csv"):
+        try:
+            df_clean = load_data()
+        except Exception as e:
+            st.error(f"❌ Lỗi khi tải dữ liệu từ output.csv: {str(e)}")
 
     # --- Hàm huấn luyện mô hình ---
     def train_models(df):
@@ -166,10 +153,10 @@ else:
         
         return rf_regressor, rf_classifier
 
-    if st.session_state.role == "giangvien" and not df_clean.empty:
+    # Huấn luyện mô hình nếu dữ liệu tồn tại
+    rf_regressor, rf_classifier = None, None
+    if not df_clean.empty:
         rf_regressor, rf_classifier = train_models(df_clean)
-    else:
-        rf_regressor, rf_classifier = None, None
 
     # --- Tabs dựa trên vai trò ---
     if st.session_state.role == "giangvien":
@@ -206,7 +193,7 @@ else:
                 st.write("### 🏫 Sinh viên có điểm tương đồng:")
                 st.dataframe(similar_students)
             else:
-                st.error("❌ Mô hình chưa được huấn luyện. Vui lòng liên hệ giảng viên để tải dữ liệu!")
+                st.error("❌ Mô hình chưa được huấn luyện. Vui lòng kiểm tra file output.csv hoặc liên hệ giảng viên để tải dữ liệu!")
 
     # Các tab chỉ dành cho GV
     if st.session_state.role == "giangvien":
@@ -269,7 +256,7 @@ else:
                 def predict_students(df):
                     try:
                         if not rf_regressor:
-                            st.error("❌ Không tìm thấy mô hình đã huấn luyện. Vui lòng huấn luyện mô hình từ file PDF trước!")
+                            st.error("❌ Không tìm thấy mô hình đã huấn luyện. Vui lòng kiểm tra file output.csv hoặc tải file PDF trước!")
                             return None, None
                         
                         df["Dự đoán Cuối kỳ"] = rf_regressor.predict(df[["Giữa kỳ", "Thường kỳ", "Thực hành"]])
