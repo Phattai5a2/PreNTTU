@@ -21,6 +21,15 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+hide_streamlit_style = """
+    <style>
+    #MainMenu {visibility: hidden;} /* Ẩn menu */
+    footer {visibility: hidden;} /* Ẩn footer chứa GitHub */
+    header {visibility: hidden;} /* Ẩn header */
+    </style>
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
 def reset_tab3_state():
     st.session_state.pop('uploaded_file', None)
     st.session_state.pop('df_filtered', None)
