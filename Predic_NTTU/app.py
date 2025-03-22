@@ -16,7 +16,9 @@ import os
 st.set_page_config(page_title="Dự đoán điểm sinh viên", layout="wide")
 
 st.markdown(
-    
+    """
+    <h1 style='text-align: center;'>🎓 Hệ thống dự đoán Điểm Cuối Kỳ & Khả Năng Qua Môn</h1>
+    """,
     unsafe_allow_html=True
 )
 
@@ -28,7 +30,6 @@ hide_streamlit_style = """
     </style>
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
-
 
 
 # Hàm kiểm tra đăng nhập
