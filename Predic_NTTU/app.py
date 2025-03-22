@@ -212,19 +212,21 @@ with tab3:
 
         # Dự đoán hàng loạt sinh viên
         def predict_students(df):
-            if os.path.exists("du_doan_diem_cuoiky.pkl"):
-                rf_regressor = joblib.load("du_doan_diem_cuoiky.pkl")
-            else:
-                if 'rf_regressor' not in globals():
-                    st.error("❌ Không tìm thấy mô hình đã huấn luyện. Vui lòng huấn luyện mô hình từ file PDF trước!")
+            try:
+                if not os.path.exists("du_doan_diem_cuoiky.pkl"):
+                    st.error("❌ Không tìm thấy file mô hình 'du_doan_diem_cuoiky.pkl'. Vui lòng kiểm tra đường dẫn hoặc huấn luyện mô hình trước!")
                     return None, None
+                
+                rf_regressor = joblib.load("du_doan_diem_cuoiky.pkl")
+                df["Dự đoán Cuối kỳ"] = rf_regressor.predict(df[["Giữa kỳ", "Thường kỳ", "Thực hành"]])
+                df["Dự đoán qua môn"] = np.where(df["Dự đoán Cuối kỳ"] >= 4, "Qua môn", "Rớt môn")
 
-            df["Dự đoán Cuối kỳ"] = rf_regressor.predict(df[["Giữa kỳ", "Thường kỳ", "Thực hành"]])
-            df["Dự đoán qua môn"] = np.where(df["Dự đoán Cuối kỳ"] >= 4, "Qua môn", "Rớt môn")
-
-            output_file = "du_doan_ketqua.xlsx"
-            df.to_excel(output_file, index=False)
-            return df, output_file
+                output_file = "du_doan_ketqua.xlsx"
+                df.to_excel(output_file, index=False)
+                return df, output_file
+            except Exception as e:
+                st.error(f"❌ Đã xảy ra lỗi khi dự đoán: {str(e)}")
+                return None, None
 
         if st.button("Dự đoán Điểm Cuối kỳ và Rủi ro Rớt môn"):
             df_result, result_file = predict_students(df_filtered)
@@ -258,4 +260,3 @@ with tab3:
                 ax.set_xlabel("Kết quả Dự đoán")
                 ax.set_ylabel("Số lượng sinh viên")
                 st.pyplot(fig)
-
