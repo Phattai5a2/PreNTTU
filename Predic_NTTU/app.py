@@ -226,36 +226,36 @@ with tab3:
         df.to_excel(output_file, index=False)
         return df, output_file
 
-        if st.button("Dự đoán Điểm Cuối kỳ và Rủi ro Rớt môn"):
-            df_result, result_file = predict_students(df_filtered)
-            if df_result is not None:  # Kiểm tra xem hàm có trả về kết quả hay không
-                st.success("✅ Dự đoán hoàn tất!")
-                st.dataframe(df_result)
+    if st.button("Dự đoán Điểm Cuối kỳ và Rủi ro Rớt môn"):
+        df_result, result_file = predict_students(df_filtered)
+        if df_result is not None:  # Kiểm tra xem hàm có trả về kết quả hay không
+            st.success("✅ Dự đoán hoàn tất!")
+            st.dataframe(df_result)
 
                 # Hiển thị danh sách sinh viên dự đoán rớt môn
-                st.subheader("Danh sách sinh viên dự đoán rớt môn")
-                df_failed = df_result[df_result["Dự đoán qua môn"] == "Rớt môn"]
-                st.dataframe(df_failed)
+            st.subheader("Danh sách sinh viên dự đoán rớt môn")
+            df_failed = df_result[df_result["Dự đoán qua môn"] == "Rớt môn"]
+            st.dataframe(df_failed)
 
-                st.download_button(
-                    label="📥 Tải về kết quả dự đoán",
-                    data=open(result_file, "rb").read(),
-                    file_name="du_doan_ketqua.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
+            st.download_button(
+                label="📥 Tải về kết quả dự đoán",
+                data=open(result_file, "rb").read(),
+                file_name="du_doan_ketqua.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
 
                 # Trực quan hóa kết quả
               
-                st.subheader("Phân bố điểm cuối kỳ dự đoán")
-                fig, ax = plt.subplots(figsize=(10, 8))
-                sns.histplot(df_result["Dự đoán Cuối kỳ"], bins=10, kde=True, ax=ax)
-                ax.set_xlabel("Điểm Cuối kỳ Dự đoán")
-                ax.set_ylabel("Số lượng sinh viên")
-                st.pyplot(fig)
+            st.subheader("Phân bố điểm cuối kỳ dự đoán")
+            fig, ax = plt.subplots(figsize=(10, 8))
+            sns.histplot(df_result["Dự đoán Cuối kỳ"], bins=10, kde=True, ax=ax)
+            ax.set_xlabel("Điểm Cuối kỳ Dự đoán")
+            ax.set_ylabel("Số lượng sinh viên")
+            st.pyplot(fig)
                 
-                st.subheader("Tỷ lệ sinh viên qua môn vs rớt môn")
-                fig, ax = plt.subplots(figsize=(10, 8))
-                sns.countplot(x="Dự đoán qua môn", data=df_result, hue="Dự đoán qua môn", palette="coolwarm", legend=False, ax=ax)
-                ax.set_xlabel("Kết quả Dự đoán")
-                ax.set_ylabel("Số lượng sinh viên")
-                st.pyplot(fig)
+            st.subheader("Tỷ lệ sinh viên qua môn vs rớt môn")
+            fig, ax = plt.subplots(figsize=(10, 8))
+            sns.countplot(x="Dự đoán qua môn", data=df_result, hue="Dự đoán qua môn", palette="coolwarm", legend=False, ax=ax)
+            ax.set_xlabel("Kết quả Dự đoán")
+            ax.set_ylabel("Số lượng sinh viên")
+            st.pyplot(fig)
