@@ -109,9 +109,6 @@ else:
     rf_regressor, rf_classifier = None, None
 
 # --- Giao diện Streamlit ---
-
-
-# Tabs
 tab2, tab1, tab3 = st.tabs(["📂 Dữ liệu", "📊 Dự đoán", "🧠 Dự đoán bằng file Excel"])
 
 with tab1:
@@ -121,7 +118,6 @@ with tab1:
     thuc_hanh = st.number_input("Nhập điểm thực hành", min_value=0.0, max_value=10.0, step=0.1)
     
     if st.button("📌 Dự đoán") and rf_regressor and rf_classifier:
-        # Tạo DataFrame cho dự đoán với tên cột
         input_reg = pd.DataFrame([[giua_ky, thuong_ky, thuc_hanh]], 
                                  columns=["Giữa kỳ", "Thường kỳ", "Thực hành"])
         diem_cuoi_ky = rf_regressor.predict(input_reg)[0]
@@ -151,13 +147,11 @@ with tab2:
 
     st.subheader("📊 Trực quan hóa dữ liệu")
     if not df_clean.empty and st.button("📌 Hiển thị tất cả biểu đồ"):
-        # Biểu đồ hộp (Box Plot)
         fig, ax = plt.subplots(figsize=(5, 3))
         sns.boxplot(data=df_clean[["Giữa kỳ", "Thường kỳ", "Thực hành", "Điểm cuối kỳ"]], ax=ax)
         ax.set_title("Biểu đồ hộp của các điểm số")
         st.pyplot(fig)
 
-        # Biểu đồ phân tán (Scatter Plot)
         fig, ax = plt.subplots(figsize=(5, 3))
         sns.scatterplot(data=df_clean, x="Điểm cuối kỳ", y="Giữa kỳ", label="Giữa kỳ", alpha=0.7)
         sns.scatterplot(data=df_clean, x="Điểm cuối kỳ", y="Thường kỳ", label="Thường kỳ", alpha=0.7)
@@ -165,32 +159,24 @@ with tab2:
         ax.set_title("Mối quan hệ giữa điểm thành phần và điểm cuối kỳ")
         st.pyplot(fig)
 
-        # Biểu đồ Pie Chart Đậu/Rớt
         pass_fail_counts = df_clean["Rớt môn"].value_counts()
         labels = ["Đậu", "Rớt"]
         colors = ["#4CAF50", "#FF5722"]
-
         fig, ax = plt.subplots(figsize=(5, 3))
         ax.pie(pass_fail_counts, labels=labels, autopct="%1.1f%%", colors=colors, startangle=90, wedgeprops={"edgecolor": "white"})
         ax.set_title("Tỷ lệ sinh viên Đậu/Rớt")
         st.pyplot(fig)
 
-
 with tab3:
     st.title("Dự đoán Điểm cuối kỳ và Rủi ro Rớt môn")
-    uploaded_file = st.file_uploader("Tải lên file Excel", type=["xlsx"])
+    uploaded_file = st.file_uploader("Tải lên file Excel", type=["xlsx"], key="excel_uploader_tab3")
 
     if uploaded_file:
-        # Lưu file tạm thời để đọc
-        file_path = "uploaded_file.xlsx"
-        with open(file_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
-
-        # Đọc file Excel
-        xls = pd.ExcelFile(file_path)
+        # Đọc trực tiếp file Excel từ bộ nhớ mà không lưu xuống đĩa
+        xls = pd.ExcelFile(uploaded_file)
         df = pd.read_excel(xls, sheet_name=xls.sheet_names[0])
 
-        # Xử lý dữ liệu trực tiếp không lưu file trung gian
+        # Xử lý dữ liệu trực tiếp trong bộ nhớ
         df_cleaned = df.dropna(how="all").reset_index(drop=True)
         stt_column = df_cleaned.iloc[:, 0]
         stt_start_index = stt_column[stt_column == 1].index[0]
@@ -214,14 +200,15 @@ with tab3:
         # Dự đoán hàng loạt sinh viên
         def predict_students(df):
             try:
-                if not os.path.exists("du_doan_diem_cuoiky.pkl"):
-                    st.error("❌ Không tìm thấy file mô hình 'du_doan_diem_cuoiky.pkl'. Vui lòng kiểm tra đường dẫn hoặc huấn luyện mô hình trước!")
+                if not rf_regressor:  # Kiểm tra xem mô hình đã được huấn luyện chưa
+                    st.error("❌ Không tìm thấy mô hình đã huấn luyện. Vui lòng huấn luyện mô hình từ file PDF trước!")
                     return None, None
                 
-                rf_regressor = joblib.load("du_doan_diem_cuoiky.pkl")
+                # Dự đoán trực tiếp
                 df["Dự đoán Cuối kỳ"] = rf_regressor.predict(df[["Giữa kỳ", "Thường kỳ", "Thực hành"]])
                 df["Dự đoán qua môn"] = np.where(df["Dự đoán Cuối kỳ"] >= 4, "Qua môn", "Rớt môn")
 
+                # Tạo file Excel trong bộ nhớ để tải xuống
                 output_file = "du_doan_ketqua.xlsx"
                 df.to_excel(output_file, index=False)
                 return df, output_file
@@ -231,7 +218,7 @@ with tab3:
 
         if st.button("Dự đoán Điểm Cuối kỳ và Rủi ro Rớt môn"):
             df_result, result_file = predict_students(df_filtered)
-            if df_result is not None:  # Kiểm tra xem hàm có trả về kết quả hay không
+            if df_result is not None:
                 st.success("✅ Dự đoán hoàn tất!")
                 st.dataframe(df_result)
 
