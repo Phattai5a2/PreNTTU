@@ -10,6 +10,7 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
+import os
 
 # Cấu hình trang
 st.set_page_config(page_title="Dự đoán điểm sinh viên", layout="wide")
