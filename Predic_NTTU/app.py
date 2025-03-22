@@ -176,91 +176,86 @@ with tab2:
 
 
 with tab3:
-    st.title("📊 Dự đoán Điểm Cuối kỳ và Rủi ro Rớt môn")
-    uploaded_file = st.file_uploader("📂 Tải lên file Excel", type=["xlsx"])
+    st.title("Dự đoán Điểm cuối kỳ và Rủi ro Rớt môn")
+    uploaded_file = st.file_uploader("Tải lên file Excel", type=["xlsx"])
 
     if uploaded_file:
-        # Đọc file Excel trực tiếp từ bộ nhớ
-        df = pd.read_excel(uploaded_file, sheet_name=0)
+        # Lưu file tạm thời để đọc
+        file_path = "uploaded_file.xlsx"
+        with open(file_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
 
-        # Kiểm tra dữ liệu có hợp lệ không
-        if df.empty:
-            st.error("❌ File Excel không có dữ liệu hợp lệ!")
-            st.stop()
+        # Đọc file Excel
+        xls = pd.ExcelFile(file_path)
+        df = pd.read_excel(xls, sheet_name=xls.sheet_names[0])
 
-        # Chuẩn hóa tên cột để tránh lỗi khoảng trắng
-        df.columns = df.columns.str.strip()
-
-        # Lọc và đổi tên cột phù hợp
-        required_columns = ["MSSV", "Họ", "Tên", "Giữa kỳ", "Thường kỳ", "Thực hành"]
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            st.error(f"❌ Thiếu các cột bắt buộc: {missing_cols}")
-            st.stop()
-
-        df_filtered = df[required_columns]
+        # Xử lý dữ liệu trực tiếp không lưu file trung gian
+        df_cleaned = df.dropna(how="all").reset_index(drop=True)
+        stt_column = df_cleaned.iloc[:, 0]
+        stt_start_index = stt_column[stt_column == 1].index[0]
+        df_filtered = df_cleaned.iloc[stt_start_index:].reset_index(drop=True)
+        df_filtered.columns = [
+            "STT", "MSSV", "Họ", "Tên", "Giới tính", "Ngày sinh", "Lớp",
+            "Giữa kỳ", "Thường kỳ", "Điểm 3", "Điểm 4", "Thực hành",
+            "Điểm 6", "Điểm 7", "Điểm 8", "Điểm 9", "Điểm 10"
+        ]
+        df_filtered = df_filtered.dropna(axis=1, how="all")
+        df_filtered = df_filtered[~df_filtered.astype(str).apply(
+            lambda row: row.str.contains(
+                "Tổng cộng|Các bộ giảng dạy|Cán bộ Giảng dạy|Trưởng khoa - Trưởng bộ môn",
+                na=False, case=False
+            )
+        ).any(axis=1)]
 
         # Chuyển đổi điểm số về kiểu số
         df_filtered[["Giữa kỳ", "Thường kỳ", "Thực hành"]] = df_filtered[["Giữa kỳ", "Thường kỳ", "Thực hành"]].apply(pd.to_numeric, errors="coerce")
-        df_filtered = df_filtered.dropna()  # Xóa dòng có giá trị NaN
 
-        # --- Huấn luyện mô hình trực tiếp ---
-        def train_models(df):
-            X_reg = df[["Giữa kỳ", "Thường kỳ", "Thực hành"]]
-            y_reg = np.random.uniform(4, 9, len(df))  # Dữ liệu giả lập điểm cuối kỳ
+        # Dự đoán hàng loạt sinh viên
+        def predict_students(df):
+            if os.path.exists("du_doan_diem_cuoiky.pkl"):
+                rf_regressor = joblib.load("du_doan_diem_cuoiky.pkl")
+            else:
+                if 'rf_regressor' not in globals():
+                    st.error("❌ Không tìm thấy mô hình đã huấn luyện. Vui lòng huấn luyện mô hình từ file PDF trước!")
+                    return None, None
 
-            X_train_reg, X_test_reg, y_train_reg, y_test_reg = train_test_split(X_reg, y_reg, test_size=0.2, random_state=42)
+            df["Dự đoán Cuối kỳ"] = rf_regressor.predict(df[["Giữa kỳ", "Thường kỳ", "Thực hành"]])
+            df["Dự đoán qua môn"] = np.where(df["Dự đoán Cuối kỳ"] >= 4, "Qua môn", "Rớt môn")
 
-            rf_regressor = RandomForestRegressor(n_estimators=100, random_state=42)
-            rf_regressor.fit(X_train_reg, y_train_reg)
+            output_file = "du_doan_ketqua.xlsx"
+            df.to_excel(output_file, index=False)
+            return df, output_file
 
-            X_clf = df[["Giữa kỳ", "Thường kỳ", "Thực hành"]]
-            y_clf = (y_reg < 5).astype(int)  # Giả lập dữ liệu qua môn/rớt môn
+        if st.button("Dự đoán Điểm Cuối kỳ và Rủi ro Rớt môn"):
+            df_result, result_file = predict_students(df_filtered)
+            if df_result is not None:  # Kiểm tra xem hàm có trả về kết quả hay không
+                st.success("✅ Dự đoán hoàn tất!")
+                st.dataframe(df_result)
 
-            X_train_clf, X_test_clf, y_train_clf, y_test_clf = train_test_split(X_clf, y_clf, test_size=0.2, random_state=42)
+                # Hiển thị danh sách sinh viên dự đoán rớt môn
+                st.subheader("Danh sách sinh viên dự đoán rớt môn")
+                df_failed = df_result[df_result["Dự đoán qua môn"] == "Rớt môn"]
+                st.dataframe(df_failed)
 
-            rf_classifier = RandomForestClassifier(n_estimators=100, random_state=42)
-            rf_classifier.fit(X_train_clf, y_train_clf)
+                st.download_button(
+                    label="📥 Tải về kết quả dự đoán",
+                    data=open(result_file, "rb").read(),
+                    file_name="du_doan_ketqua.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
 
-            return rf_regressor, rf_classifier
-
-        rf_regressor, rf_classifier = train_models(df_filtered)
-
-        # --- Dự đoán hàng loạt sinh viên ---
-        df_filtered["Dự đoán Cuối kỳ"] = rf_regressor.predict(df_filtered[["Giữa kỳ", "Thường kỳ", "Thực hành"]])
-        df_filtered["Dự đoán qua môn"] = np.where(df_filtered["Dự đoán Cuối kỳ"] >= 5, "Qua môn", "Rớt môn")
-
-        # Hiển thị kết quả dự đoán
-        st.success("✅ Dự đoán hoàn tất!")
-        st.dataframe(df_filtered)
-
-        # Tạo file Excel trong bộ nhớ thay vì lưu vào ổ đĩa
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-            df_filtered.to_excel(writer, index=False, sheet_name="Kết quả")
-            writer.close()
-        output.seek(0)
-
-        # Nút tải xuống file Excel
-        st.download_button(
-            label="📥 Tải về kết quả dự đoán",
-            data=output,
-            file_name="du_doan_ketqua.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-
-        # --- Trực quan hóa kết quả ---
-        st.subheader("📊 Phân bố điểm cuối kỳ dự đoán")
-        fig, ax = plt.subplots(figsize=(8, 5))
-        sns.histplot(df_filtered["Dự đoán Cuối kỳ"], bins=10, kde=True, ax=ax)
-        ax.set_xlabel("Điểm Cuối kỳ Dự đoán")
-        ax.set_ylabel("Số lượng sinh viên")
-        st.pyplot(fig)
-
-        st.subheader("📊 Tỷ lệ sinh viên qua môn vs rớt môn")
-        fig, ax = plt.subplots(figsize=(8, 5))
-        sns.countplot(x="Dự đoán qua môn", data=df_filtered, hue="Dự đoán qua môn", palette="coolwarm", legend=False, ax=ax)
-        ax.set_xlabel("Kết quả Dự đoán")
-        ax.set_ylabel("Số lượng sinh viên")
-        st.pyplot(fig)
+                # Trực quan hóa kết quả
+                st.subheader("Phân bố điểm cuối kỳ dự đoán")
+                fig, ax = plt.subplots(figsize=(10, 8))
+                sns.histplot(df_result["Dự đoán Cuối kỳ"], bins=10, kde=True, ax=ax)
+                ax.set_xlabel("Điểm Cuối kỳ Dự đoán")
+                ax.set_ylabel("Số lượng sinh viên")
+                st.pyplot(fig)
+                
+                st.subheader("Tỷ lệ sinh viên qua môn vs rớt môn")
+                fig, ax = plt.subplots(figsize=(10, 8))
+                sns.countplot(x="Dự đoán qua môn", data=df_result, hue="Dự đoán qua môn", palette="coolwarm", legend=False, ax=ax)
+                ax.set_xlabel("Kết quả Dự đoán")
+                ax.set_ylabel("Số lượng sinh viên")
+                st.pyplot(fig)
 
