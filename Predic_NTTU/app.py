@@ -22,6 +22,10 @@ st.markdown(
     [data-testid="stToolbar"] {
         visibility: hidden;
     }
+    
+    [data-testid="stDecoration"] {
+        visibility: hidden;
+    }
     </style>
     """,
     unsafe_allow_html=True
