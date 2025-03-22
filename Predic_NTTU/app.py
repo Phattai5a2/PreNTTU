@@ -17,7 +17,6 @@ st.set_page_config(page_title="Dự đoán điểm sinh viên", layout="wide")
 
 # Hàm kiểm tra đăng nhập
 def check_login(username, password):
-    # Tài khoản cố định (có thể thay bằng cơ sở dữ liệu)
     users = {
         "gv": {"password": "gv123", "role": "giangvien"},
         "sv": {"password": "sv123", "role": "sinhvien"}
@@ -51,7 +50,7 @@ if not st.session_state.logged_in:
                 st.session_state.logged_in = True
                 st.session_state.role = role
                 st.success(f"Đăng nhập thành công với vai trò: {role}")
-                st.rerun()  # Tải lại trang sau khi đăng nhập
+                st.rerun()
             else:
                 st.error("Tên đăng nhập hoặc mật khẩu không đúng!")
 else:
@@ -63,8 +62,7 @@ else:
         unsafe_allow_html=True
     )
     
-    # Nút đăng xuất
-    if st.button("Đăng xuất"):
+    if st.button("Đăng xuất", key="logout_button"):
         st.session_state.logged_in = False
         st.session_state.role = None
         st.rerun()
@@ -79,7 +77,7 @@ else:
     # Xử lý file PDF (chỉ dành cho GV)
     if st.session_state.role == "giangvien":
         st.header("📂 Tải lên file PDF chứa dữ liệu điểm")
-        uploaded_files = st.file_uploader("Chọn một hoặc nhiều file PDF", accept_multiple_files=True, type=["pdf"])
+        uploaded_files = st.file_uploader("Chọn một hoặc nhiều file PDF", accept_multiple_files=True, type=["pdf"], key="pdf_uploader")
 
         csv_path = "output.csv"
         data = []
@@ -166,32 +164,33 @@ else:
     # Tab Dự đoán (cả GV và SV đều thấy)
     with tab1:
         st.header("🔍 Nhập điểm để dự đoán")
-        giua_ky = st.number_input("Nhập điểm giữa kỳ", min_value=0.0, max_value=10.0, step=0.1)
-        thuong_ky = st.number_input("Nhập điểm thường kỳ", min_value=0.0, max_value=10.0, step=0.1)
-        thuc_hanh = st.number_input("Nhập điểm thực hành", min_value=0.0, max_value=10.0, step=0.1)
+        giua_ky = st.number_input("Nhập điểm giữa kỳ", min_value=0.0, max_value=10.0, step=0.1, key="giua_ky_input")
+        thuong_ky = st.number_input("Nhập điểm thường kỳ", min_value=0.0, max_value=10.0, step=0.1, key="thuong_ky_input")
+        thuc_hanh = st.number_input("Nhập điểm thực hành", min_value=0.0, max_value=10.0, step=0.1, key="thuc_hanh_input")
         
-        if st.button("📌 Dự đoán") and rf_regressor and rf_classifier:
-            input_reg = pd.DataFrame([[giua_ky, thuong_ky, thuc_hanh]], 
-                                     columns=["Giữa kỳ", "Thường kỳ", "Thực hành"])
-            diem_cuoi_ky = rf_regressor.predict(input_reg)[0]
-            
-            input_clf = pd.DataFrame([[giua_ky, thuong_ky, thuc_hanh, diem_cuoi_ky]], 
-                                     columns=["Giữa kỳ", "Thường kỳ", "Thực hành", "Điểm cuối kỳ"])
-            rot_mon = rf_classifier.predict(input_clf)[0]
-            
-            st.write(f"### 📈 Điểm cuối kỳ dự đoán: {diem_cuoi_ky:.2f}")
-            if rot_mon == 0:
-                st.success("✅ Sinh viên có khả năng qua môn!")
+        if st.button("📌 Dự đoán", key="predict_button_tab1"):
+            if rf_regressor and rf_classifier:
+                input_reg = pd.DataFrame([[giua_ky, thuong_ky, thuc_hanh]], 
+                                        columns=["Giữa kỳ", "Thường kỳ", "Thực hành"])
+                diem_cuoi_ky = rf_regressor.predict(input_reg)[0]
+                
+                input_clf = pd.DataFrame([[giua_ky, thuong_ky, thuc_hanh, diem_cuoi_ky]], 
+                                        columns=["Giữa kỳ", "Thường kỳ", "Thực hành", "Điểm cuối kỳ"])
+                rot_mon = rf_classifier.predict(input_clf)[0]
+                
+                st.write(f"### 📈 Điểm cuối kỳ dự đoán: {diem_cuoi_ky:.2f}")
+                if rot_mon == 0:
+                    st.success("✅ Sinh viên có khả năng qua môn!")
+                else:
+                    st.error("❌ Sinh viên có nguy cơ rớt môn!")
+                
+                df_clean["Khoảng cách"] = euclidean_distances(df_clean[["Giữa kỳ", "Thường kỳ", "Thực hành"]], input_reg).flatten()
+                similar_students = df_clean.nsmallest(5, "Khoảng cách")[["Mã SV", "Họ đệm", "Tên", "Giữa kỳ", "Thường kỳ", "Thực hành", "Điểm cuối kỳ"]]
+                
+                st.write("### 🏫 Sinh viên có điểm tương đồng:")
+                st.dataframe(similar_students)
             else:
-                st.error("❌ Sinh viên có nguy cơ rớt môn!")
-            
-            df_clean["Khoảng cách"] = euclidean_distances(df_clean[["Giữa kỳ", "Thường kỳ", "Thực hành"]], input_reg).flatten()
-            similar_students = df_clean.nsmallest(5, "Khoảng cách")[["Mã SV", "Họ đệm", "Tên", "Giữa kỳ", "Thường kỳ", "Thực hành", "Điểm cuối kỳ"]]
-            
-            st.write("### 🏫 Sinh viên có điểm tương đồng:")
-            st.dataframe(similar_students)
-        elif st.button("📌 Dự đoán") and (rf_regressor is None or rf_classifier is None):
-            st.error("❌ Mô hình chưa được huấn luyện. Vui lòng liên hệ giảng viên để tải dữ liệu!")
+                st.error("❌ Mô hình chưa được huấn luyện. Vui lòng liên hệ giảng viên để tải dữ liệu!")
 
     # Các tab chỉ dành cho GV
     if st.session_state.role == "giangvien":
@@ -203,7 +202,7 @@ else:
                 st.warning("Chưa có dữ liệu để hiển thị. Vui lòng tải file PDF trước.")
 
             st.subheader("📊 Trực quan hóa dữ liệu")
-            if not df_clean.empty and st.button("📌 Hiển thị tất cả biểu đồ"):
+            if not df_clean.empty and st.button("📌 Hiển thị tất cả biểu đồ", key="visualize_button_tab2"):
                 fig, ax = plt.subplots(figsize=(5, 3))
                 sns.boxplot(data=df_clean[["Giữa kỳ", "Thường kỳ", "Thực hành", "Điểm cuối kỳ"]], ax=ax)
                 ax.set_title("Biểu đồ hộp của các điểm số")
@@ -267,7 +266,7 @@ else:
                         st.error(f"❌ Đã xảy ra lỗi khi dự đoán: {str(e)}")
                         return None, None
 
-                if st.button("Dự đoán Điểm Cuối kỳ và Rủi ro Rớt môn"):
+                if st.button("Dự đoán Điểm Cuối kỳ và Rủi ro Rớt môn", key="predict_button_tab3"):
                     df_result, result_file = predict_students(df_filtered)
                     if df_result is not None:
                         st.success("✅ Dự đoán hoàn tất!")
@@ -281,7 +280,8 @@ else:
                             label="📥 Tải về kết quả dự đoán",
                             data=open(result_file, "rb").read(),
                             file_name="du_doan_ketqua.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            key="download_button_tab3"
                         )
 
                         st.subheader("Phân bố điểm cuối kỳ dự đoán")
