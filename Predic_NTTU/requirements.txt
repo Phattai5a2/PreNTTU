@@ -7,3 +7,4 @@ seaborn
 pdfplumber
 joblib
 openpyxl
+xlrd
