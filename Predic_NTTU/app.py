@@ -240,7 +240,7 @@ else:
 
         with tab3:
             st.title("Dự đoán Điểm cuối kỳ và Rủi ro Rớt môn")
-            uploaded_file = st.file_uploader("Tải lên file Excel", type=["xls"], key="excel_uploader_tab3")  # Chỉ hỗ trợ .xls
+            uploaded_file = st.file_uploader("Tải lên file Excel", type=["xls", "xlsx"], key="excel_uploader_tab3")  # Hỗ trợ cả .xls và .xlsx
 
             if uploaded_file:
                 xls = pd.ExcelFile(uploaded_file)
@@ -274,8 +274,8 @@ else:
                         df["Dự đoán Cuối kỳ"] = rf_regressor.predict(df[["Giữa kỳ", "Thường kỳ", "Thực hành"]])
                         df["Dự đoán qua môn"] = np.where(df["Dự đoán Cuối kỳ"] >= 4, "Qua môn", "Rớt môn")
 
-                        output_file = "du_doan_ketqua.xls"  # Đổi định dạng đầu ra thành .xls
-                        df.to_excel(output_file, index=False, engine='xlwt')  # Sử dụng xlwt cho .xls
+                        output_file = "du_doan_ketqua.xlsx"
+                        df.to_excel(output_file, index=False)
                         return df, output_file
                     except Exception as e:
                         st.error(f"❌ Đã xảy ra lỗi khi dự đoán: {str(e)}")
@@ -294,8 +294,8 @@ else:
                         st.download_button(
                             label="📥 Tải về kết quả dự đoán",
                             data=open(result_file, "rb").read(),
-                            file_name="du_doan_ketqua.xls",  # Đổi tên file tải về thành .xls
-                            mime="application/vnd.ms-excel",  # MIME cho .xls
+                            file_name="du_doan_ketqua.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                             key="download_button_tab3"
                         )
 
