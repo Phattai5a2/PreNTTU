@@ -212,20 +212,19 @@ with tab3:
         df_filtered[["Giữa kỳ", "Thường kỳ", "Thực hành"]] = df_filtered[["Giữa kỳ", "Thường kỳ", "Thực hành"]].apply(pd.to_numeric, errors="coerce")
 
         # Dự đoán hàng loạt sinh viên
-        def predict_students(df):
-    if os.path.exists("du_doan_diem_cuoiky.pkl"):
-        rf_regressor = joblib.load("du_doan_diem_cuoiky.pkl")
-    else:
-        st.error("❌ Không tìm thấy mô hình đã huấn luyện. Vui lòng huấn luyện mô hình từ file PDF trước!")
-        return None, None  # ⬅ Dừng hoàn toàn, không để chương trình tiếp tục
+    def predict_students(df):
+        if os.path.exists("du_doan_diem_cuoiky.pkl"):
+            rf_regressor = joblib.load("du_doan_diem_cuoiky.pkl")
+        else:
+            st.error("❌ Không tìm thấy mô hình đã huấn luyện. Vui lòng huấn luyện mô hình từ file PDF trước!")
+            return None, None  # ⬅ Dừng hoàn toàn, không để chương trình tiếp tục
 
-    df["Dự đoán Cuối kỳ"] = rf_regressor.predict(df[["Giữa kỳ", "Thường kỳ", "Thực hành"]])
-    df["Dự đoán qua môn"] = np.where(df["Dự đoán Cuối kỳ"] >= 5, "Qua môn", "Rớt môn")
+        df["Dự đoán Cuối kỳ"] = rf_regressor.predict(df[["Giữa kỳ", "Thường kỳ", "Thực hành"]])
+        df["Dự đoán qua môn"] = np.where(df["Dự đoán Cuối kỳ"] >= 5, "Qua môn", "Rớt môn")
 
-    output_file = "du_doan_ketqua.xlsx"
-    df.to_excel(output_file, index=False)
-    return df, output_file
-
+        output_file = "du_doan_ketqua.xlsx"
+        df.to_excel(output_file, index=False)
+        return df, output_file
 
         if st.button("Dự đoán Điểm Cuối kỳ và Rủi ro Rớt môn"):
             df_result, result_file = predict_students(df_filtered)
