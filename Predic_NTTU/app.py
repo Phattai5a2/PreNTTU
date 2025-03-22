@@ -240,40 +240,30 @@ else:
 
         with tab3:
             st.title("Dự đoán Điểm cuối kỳ và Rủi ro Rớt môn")
-            uploaded_file = st.file_uploader("Tải lên file Excel", type=["xls", "xlsx"], key="excel_uploader_tab3")  # Hỗ trợ cả .xls và .xlsx
+            uploaded_file = st.file_uploader("Tải lên file Excel", type=["xls"], key="excel_uploader_tab3")  # Chỉ hỗ trợ .xls
 
             if uploaded_file:
-                # Đọc file Excel
                 xls = pd.ExcelFile(uploaded_file)
-                df = pd.read_excel(xls, sheet_name=xls.sheet_names[0], header=None)  # Không giả định header mặc định
+                df = pd.read_excel(xls, sheet_name=xls.sheet_names[0])
 
-                # Tìm dòng bắt đầu dữ liệu (dòng có "STT" ở cột đầu tiên)
-                stt_row_idx = df[df.iloc[:, 0] == "STT"].index[0]
-                df_cleaned = df.iloc[stt_row_idx:].reset_index(drop=True)
-
-                # Gán tên cột từ dòng tiêu đề
-                headers = df_cleaned.iloc[0].fillna("").tolist()
-                df_cleaned = df_cleaned[1:].reset_index(drop=True)
-                df_cleaned.columns = headers
-
-                # Loại bỏ các dòng không phải dữ liệu sinh viên
-                df_filtered = df_cleaned[
-                    df_cleaned["STT"].notna() & 
-                    df_cleaned["STT"].str.match(r'^\d+$')  # Chỉ giữ các dòng có STT là số
+                df_cleaned = df.dropna(how="all").reset_index(drop=True)
+                stt_column = df_cleaned.iloc[:, 0]
+                stt_start_index = stt_column[stt_column == 1].index[0]
+                df_filtered = df_cleaned.iloc[stt_start_index:].reset_index(drop=True)
+                df_filtered.columns = [
+                    "STT", "MSSV", "Họ", "Tên", "Giới tính", "Ngày sinh", "Lớp",
+                    "Giữa kỳ", "Thường kỳ", "Điểm 3", "Điểm 4", "Thực hành",
+                    "Điểm 6", "Điểm 7", "Điểm 8", "Điểm 9", "Điểm 10"
                 ]
+                df_filtered = df_filtered.dropna(axis=1, how="all")
+                df_filtered = df_filtered[~df_filtered.astype(str).apply(
+                    lambda row: row.str.contains(
+                        "Tổng cộng|Các bộ giảng dạy|Cán bộ Giảng dạy|Trưởng khoa - Trưởng bộ môn",
+                        na=False, case=False
+                    )
+                ).any(axis=1)]
 
-                # Đổi tên cột để khớp với mô hình
-                df_filtered = df_filtered.rename(columns={
-                    "Giữa kỳ\n20%": "Giữa kỳ",
-                    "Thường kỳ 20%": "Thường kỳ",
-                    "1": "Thực hành"  # Lấy cột "1" dưới "Thực hành" làm điểm thực hành
-                })
-
-                # Chuyển đổi kiểu dữ liệu
                 df_filtered[["Giữa kỳ", "Thường kỳ", "Thực hành"]] = df_filtered[["Giữa kỳ", "Thường kỳ", "Thực hành"]].apply(pd.to_numeric, errors="coerce")
-
-                # Loại bỏ các hàng có giá trị NaN trong các cột điểm
-                df_filtered = df_filtered.dropna(subset=["Giữa kỳ", "Thường kỳ", "Thực hành"])
 
                 def predict_students(df):
                     try:
@@ -284,8 +274,8 @@ else:
                         df["Dự đoán Cuối kỳ"] = rf_regressor.predict(df[["Giữa kỳ", "Thường kỳ", "Thực hành"]])
                         df["Dự đoán qua môn"] = np.where(df["Dự đoán Cuối kỳ"] >= 4, "Qua môn", "Rớt môn")
 
-                        output_file = "du_doan_ketqua.xlsx"
-                        df.to_excel(output_file, index=False)
+                        output_file = "du_doan_ketqua.xls"  # Đổi định dạng đầu ra thành .xls
+                        df.to_excel(output_file, index=False, engine='xlwt')  # Sử dụng xlwt cho .xls
                         return df, output_file
                     except Exception as e:
                         st.error(f"❌ Đã xảy ra lỗi khi dự đoán: {str(e)}")
@@ -304,8 +294,8 @@ else:
                         st.download_button(
                             label="📥 Tải về kết quả dự đoán",
                             data=open(result_file, "rb").read(),
-                            file_name="du_doan_ketqua.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            file_name="du_doan_ketqua.xls",  # Đổi tên file tải về thành .xls
+                            mime="application/vnd.ms-excel",  # MIME cho .xls
                             key="download_button_tab3"
                         )
 
