@@ -1,0 +1,10 @@
+streamlit
+numpy
+pandas
+pickle5
+pdfplumber
+scikit-learn
+matplotlib
+seaborn
+joblib
+openpyxl
