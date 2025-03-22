@@ -12,8 +12,7 @@ import seaborn as sns
 import joblib
 import os
 
-# Cấu hình trang
-st.set_page_config(page_title="Dự đoán điểm sinh viên", layout="wide")
+st.set_page_config(page_title="Dự đoán điểm sinh viên", layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown(
     """
