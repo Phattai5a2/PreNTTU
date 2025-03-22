@@ -240,7 +240,7 @@ else:
 
         with tab3:
             st.title("Dự đoán Điểm cuối kỳ và Rủi ro Rớt môn")
-            uploaded_file = st.file_uploader("Tải lên file Excel", type=["xlsx"], key="excel_uploader_tab3")
+            uploaded_file = st.file_uploader("Tải lên file Excel", type=["xls", "xlsx"], key="excel_uploader_tab3")  # Hỗ trợ cả .xls và .xlsx
 
             if uploaded_file:
                 xls = pd.ExcelFile(uploaded_file)
