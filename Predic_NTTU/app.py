@@ -298,15 +298,22 @@ else:
                     df_cleaned = df.iloc[stt_row_idx + 2:].reset_index(drop=True)
                     df_cleaned.columns = combined_headers
         
-                    # Kiểm tra dữ liệu trong df_cleaned
-                    st.write("### Dữ liệu thô (df_cleaned):")
-                    st.dataframe(df_cleaned)
-        
-                    # Loại bỏ các dòng không phải dữ liệu sinh viên
-                    df_filtered = df_cleaned[
+                    # Loại bỏ các dòng không phải dữ liệu sinh viên (dòng có "STT" không phải số)
+                    df_cleaned = df_cleaned[
                         df_cleaned["STT"].notna() & 
                         df_cleaned["STT"].str.match(r'^\d+$')
                     ]
+        
+                    # Kiểm tra dữ liệu trong df_cleaned
+                    st.write("### Dữ liệu thô (df_cleaned) sau khi lọc dòng không hợp lệ:")
+                    # Chuyển đổi kiểu dữ liệu trước khi hiển thị
+                    for col in ["Giữa kỳ", "Thường kỳ", "Thực hành"]:
+                        if col in df_cleaned.columns:
+                            df_cleaned[col] = pd.to_numeric(df_cleaned[col], errors="coerce")
+                    st.dataframe(df_cleaned)
+        
+                    # Gán df_filtered = df_cleaned (vì đã lọc ở bước trên)
+                    df_filtered = df_cleaned
         
                     # Kiểm tra dữ liệu trong df_filtered
                     st.write("### Dữ liệu sau khi lọc (df_filtered):")
@@ -318,9 +325,6 @@ else:
                     if missing_columns:
                         st.error(f"❌ File Excel thiếu các cột cần thiết: {', '.join(missing_columns)}")
                     else:
-                        # Chuyển đổi kiểu dữ liệu
-                        df_filtered[["Giữa kỳ", "Thường kỳ", "Thực hành"]] = df_filtered[["Giữa kỳ", "Thường kỳ", "Thực hành"]].apply(pd.to_numeric, errors="coerce")
-        
                         # Kiểm tra dữ liệu trước khi dự đoán
                         st.write("### Dữ liệu sau khi xử lý:")
                         # Kiểm tra các cột có trong df_filtered
