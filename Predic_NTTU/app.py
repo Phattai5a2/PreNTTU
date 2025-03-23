@@ -254,7 +254,7 @@ else:
                 ax.set_title("Tỷ lệ sinh viên Đậu/Rớt")
                 st.pyplot(fig)
 
-        
+
         with tab3:
             st.title("Dự đoán Điểm cuối kỳ và Rủi ro Rớt môn")
             uploaded_file = st.file_uploader("Tải lên file Excel", type=["xls", "xlsx"], key="excel_uploader_tab3")
@@ -274,12 +274,29 @@ else:
                 if stt_row_idx is None:
                     st.error("❌ Không tìm thấy cột 'STT' trong file Excel. Vui lòng kiểm tra lại định dạng file!")
                 else:
-                    df_cleaned = df.iloc[stt_row_idx:].reset_index(drop=True)
+                    # Lấy hai dòng tiêu đề
+                    header_row_1 = df.iloc[stt_row_idx].fillna("").tolist()  # Dòng tiêu đề chính (có "STT", "Thông tin sinh viên", ...)
+                    header_row_2 = df.iloc[stt_row_idx + 1].fillna("").tolist()  # Dòng tiêu đề con (có "Mã sinh viên", "Họ đệm", "Tên", ...)
         
-                    # Gán tên cột từ dòng tiêu đề
-                    headers = df_cleaned.iloc[0].fillna("").tolist()
-                    df_cleaned = df_cleaned[1:].reset_index(drop=True)
-                    df_cleaned.columns = headers
+                    # Kết hợp hai dòng tiêu đề để tạo tên cột
+                    combined_headers = []
+                    for h1, h2 in zip(header_row_1, header_row_2):
+                        if h1 == "STT":
+                            combined_headers.append("STT")
+                        elif h1 == "Thông tin sinh viên" and h2:
+                            combined_headers.append(h2)  # Lấy tiêu đề con (Mã sinh viên, Họ đệm, Tên, ...)
+                        elif h1 == "Giữa kỳ\n20%":
+                            combined_headers.append("Giữa kỳ")
+                        elif h1 == "Thường kỳ 20%":
+                            combined_headers.append("Thường kỳ")
+                        elif h1 == "Thực hành" and h2 in ["1", "Thực hành 1", "Thực hành"]:
+                            combined_headers.append("Thực hành")
+                        else:
+                            combined_headers.append(h1 if h1 else h2)  # Giữ tiêu đề chính nếu không có tiêu đề con
+        
+                    # Lấy dữ liệu từ dòng sau tiêu đề
+                    df_cleaned = df.iloc[stt_row_idx + 2:].reset_index(drop=True)
+                    df_cleaned.columns = combined_headers
         
                     # Loại bỏ các dòng không phải dữ liệu sinh viên
                     df_filtered = df_cleaned[
@@ -288,27 +305,11 @@ else:
                     ]
         
                     # Kiểm tra xem các cột cần thiết có tồn tại không
-                    required_columns = ["Giữa kỳ\n20%", "Thường kỳ 20%"]
-                    possible_thuc_hanh_columns = ["1", "Thực hành 1", "Thực hành"]  # Các tên cột Thực hành có thể có
-                    thuc_hanh_column = None
-                    for col in possible_thuc_hanh_columns:
-                        if col in df_filtered.columns:
-                            thuc_hanh_column = col
-                            break
-        
+                    required_columns = ["Giữa kỳ", "Thường kỳ", "Thực hành"]
                     missing_columns = [col for col in required_columns if col not in df_filtered.columns]
                     if missing_columns:
                         st.error(f"❌ File Excel thiếu các cột cần thiết: {', '.join(missing_columns)}")
-                    elif thuc_hanh_column is None:
-                        st.error("❌ Không tìm thấy cột điểm Thực hành (có thể là '1', 'Thực hành 1', hoặc 'Thực hành')!")
                     else:
-                        # Đổi tên cột để khớp với mô hình
-                        df_filtered = df_filtered.rename(columns={
-                            "Giữa kỳ\n20%": "Giữa kỳ",
-                            "Thường kỳ 20%": "Thường kỳ",
-                            thuc_hanh_column: "Thực hành"
-                        })
-        
                         # Chuyển đổi kiểu dữ liệu
                         df_filtered[["Giữa kỳ", "Thường kỳ", "Thực hành"]] = df_filtered[["Giữa kỳ", "Thường kỳ", "Thực hành"]].apply(pd.to_numeric, errors="coerce")
         
