@@ -255,16 +255,15 @@ else:
                 st.pyplot(fig)
 
         
-
         with tab3:
             st.title("Dự đoán Điểm cuối kỳ và Rủi ro Rớt môn")
             uploaded_file = st.file_uploader("Tải lên file Excel", type=["xls", "xlsx"], key="excel_uploader_tab3")
-    
+        
             if uploaded_file:
                 # Đọc file Excel
                 xls = pd.ExcelFile(uploaded_file)
                 df = pd.read_excel(xls, sheet_name=xls.sheet_names[0], header=None)
-    
+        
                 # Tìm dòng bắt đầu dữ liệu (dòng có "STT" ở cột đầu tiên)
                 stt_row_idx = None
                 for idx, row in df.iterrows():
@@ -276,18 +275,18 @@ else:
                     st.error("❌ Không tìm thấy cột 'STT' trong file Excel. Vui lòng kiểm tra lại định dạng file!")
                 else:
                     df_cleaned = df.iloc[stt_row_idx:].reset_index(drop=True)
-    
+        
                     # Gán tên cột từ dòng tiêu đề
                     headers = df_cleaned.iloc[0].fillna("").tolist()
                     df_cleaned = df_cleaned[1:].reset_index(drop=True)
                     df_cleaned.columns = headers
-    
+        
                     # Loại bỏ các dòng không phải dữ liệu sinh viên
                     df_filtered = df_cleaned[
                         df_cleaned["STT"].notna() & 
                         df_cleaned["STT"].str.match(r'^\d+$')
                     ]
-    
+        
                     # Kiểm tra xem các cột cần thiết có tồn tại không
                     required_columns = ["Giữa kỳ\n20%", "Thường kỳ 20%"]
                     possible_thuc_hanh_columns = ["1", "Thực hành 1", "Thực hành"]  # Các tên cột Thực hành có thể có
@@ -296,7 +295,7 @@ else:
                         if col in df_filtered.columns:
                             thuc_hanh_column = col
                             break
-    
+        
                     missing_columns = [col for col in required_columns if col not in df_filtered.columns]
                     if missing_columns:
                         st.error(f"❌ File Excel thiếu các cột cần thiết: {', '.join(missing_columns)}")
@@ -309,13 +308,23 @@ else:
                             "Thường kỳ 20%": "Thường kỳ",
                             thuc_hanh_column: "Thực hành"
                         })
-    
+        
                         # Chuyển đổi kiểu dữ liệu
                         df_filtered[["Giữa kỳ", "Thường kỳ", "Thực hành"]] = df_filtered[["Giữa kỳ", "Thường kỳ", "Thực hành"]].apply(pd.to_numeric, errors="coerce")
-    
+        
                         # Kiểm tra dữ liệu trước khi dự đoán
                         st.write("### Dữ liệu sau khi xử lý:")
-                        st.dataframe(df_filtered[["STT", "Mã sinh viên", "Họ đệm", "Tên", "Giữa kỳ", "Thường kỳ", "Thực hành"]])
+                        # Kiểm tra các cột có trong df_filtered
+                        available_columns = df_filtered.columns.tolist()
+                        st.write("Các cột có trong df_filtered:", available_columns)
+        
+                        # Chỉ chọn các cột có trong df_filtered để hiển thị
+                        display_columns = ["STT", "Mã sinh viên", "Họ đệm", "Tên", "Giữa kỳ", "Thường kỳ", "Thực hành"]
+                        columns_to_display = [col for col in display_columns if col in available_columns]
+                        if columns_to_display:
+                            st.dataframe(df_filtered[columns_to_display])
+                        else:
+                            st.error("❌ Không có cột nào trong số ['STT', 'Mã sinh viên', 'Họ đệm', 'Tên', 'Giữa kỳ', 'Thường kỳ', 'Thực hành'] tồn tại trong file Excel!")
                         
                         if df_filtered.empty:
                             st.error("❌ Không có dữ liệu hợp lệ để dự đoán. Vui lòng kiểm tra file Excel!")
@@ -325,7 +334,7 @@ else:
                             # Loại bỏ các hàng có giá trị NaN trong các cột điểm
                             df_filtered = df_filtered.dropna(subset=["Giữa kỳ", "Thường kỳ", "Thực hành"])
                             st.write(f"Số lượng mẫu dữ liệu sau khi loại NaN: {len(df_filtered)}")
-    
+        
                             def predict_students(df):
                                 try:
                                     if not rf_regressor:
@@ -335,27 +344,27 @@ else:
                                     if df[["Giữa kỳ", "Thường kỳ", "Thực hành"]].empty:
                                         st.error("❌ Dữ liệu đầu vào rỗng. Không thể dự đoán!")
                                         return None, None
-    
+        
                                     df["Dự đoán Cuối kỳ"] = rf_regressor.predict(df[["Giữa kỳ", "Thường kỳ", "Thực hành"]])
                                     df["Dự đoán qua môn"] = np.where(df["Dự đoán Cuối kỳ"] >= 4, "Qua môn", "Rớt môn")
-    
+        
                                     output_file = "du_doan_ketqua.xlsx"
                                     df.to_excel(output_file, index=False)
                                     return df, output_file
                                 except Exception as e:
                                     st.error(f"❌ Đã xảy ra lỗi khi dự đoán: {str(e)}")
                                     return None, None
-    
+        
                             if st.button("Dự đoán Điểm Cuối kỳ và Rủi ro Rớt môn", key="predict_button_tab3"):
                                 df_result, result_file = predict_students(df_filtered)
                                 if df_result is not None:
                                     st.success("✅ Dự đoán hoàn tất!")
                                     st.dataframe(df_result)
-    
+        
                                     st.subheader("Danh sách sinh viên dự đoán rớt môn")
                                     df_failed = df_result[df_result["Dự đoán qua môn"] == "Rớt môn"]
                                     st.dataframe(df_failed)
-    
+        
                                     st.download_button(
                                         label="📥 Tải về kết quả dự đoán",
                                         data=open(result_file, "rb").read(),
@@ -363,7 +372,7 @@ else:
                                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                         key="download_button_tab3"
                                     )
-    
+        
                                     st.subheader("Phân bố điểm cuối kỳ dự đoán")
                                     fig, ax = plt.subplots(figsize=(10, 8))
                                     sns.histplot(df_result["Dự đoán Cuối kỳ"], bins=10, kde=True, ax=ax)
