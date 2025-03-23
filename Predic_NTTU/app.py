@@ -275,8 +275,8 @@ else:
                     st.error("❌ Không tìm thấy cột 'STT' trong file Excel. Vui lòng kiểm tra lại định dạng file!")
                 else:
                     # Lấy hai dòng tiêu đề
-                    header_row_1 = df.iloc[stt_row_idx].fillna("").tolist()  # Dòng tiêu đề chính (có "STT", "Thông tin sinh viên", ...)
-                    header_row_2 = df.iloc[stt_row_idx + 1].fillna("").tolist()  # Dòng tiêu đề con (có "Mã sinh viên", "Họ đệm", "Tên", ...)
+                    header_row_1 = df.iloc[stt_row_idx].fillna("").tolist()  # Dòng tiêu đề chính
+                    header_row_2 = df.iloc[stt_row_idx + 1].fillna("").tolist()  # Dòng tiêu đề con
         
                     # Kết hợp hai dòng tiêu đề để tạo tên cột
                     combined_headers = []
@@ -292,17 +292,25 @@ else:
                         elif h1 == "Thực hành" and h2 in ["1", "Thực hành 1", "Thực hành"]:
                             combined_headers.append("Thực hành")
                         else:
-                            combined_headers.append(h1 if h1 else h2)  # Giữ tiêu đề chính nếu không có tiêu đề con
+                            combined_headers.append(h1 if h1 else h2)
         
                     # Lấy dữ liệu từ dòng sau tiêu đề
                     df_cleaned = df.iloc[stt_row_idx + 2:].reset_index(drop=True)
                     df_cleaned.columns = combined_headers
+        
+                    # Kiểm tra dữ liệu trong df_cleaned
+                    st.write("### Dữ liệu thô (df_cleaned):")
+                    st.dataframe(df_cleaned)
         
                     # Loại bỏ các dòng không phải dữ liệu sinh viên
                     df_filtered = df_cleaned[
                         df_cleaned["STT"].notna() & 
                         df_cleaned["STT"].str.match(r'^\d+$')
                     ]
+        
+                    # Kiểm tra dữ liệu trong df_filtered
+                    st.write("### Dữ liệu sau khi lọc (df_filtered):")
+                    st.dataframe(df_filtered)
         
                     # Kiểm tra xem các cột cần thiết có tồn tại không
                     required_columns = ["Giữa kỳ", "Thường kỳ", "Thực hành"]
